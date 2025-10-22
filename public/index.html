@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>RT Store - Painel de Estoque</title>
+<style>
+  body {
+    font-family: 'Arial', sans-serif;
+    background: #1c1c1c;
+    color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    color: #ffcc00;
+  }
+  .container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 500px;
+  }
+  .item-card {
+    background: #2c2c2c;
+    border-radius: 10px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .item-header {
+    font-size: 18px;
+    font-weight: bold;
+  }
+  .field-group {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  input[type="number"] {
+    width: 100px;
+    padding: 5px;
+    border-radius: 5px;
+    border: none;
+    text-align: center;
+  }
+  button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 7px;
+    background: #ffcc00;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: 0.2s;
+  }
+  button:hover {
+    background: #e6b800;
+  }
+  .notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #333;
+    padding: 10px 20px;
+    border-radius: 7px;
+    display: none;
+    z-index: 9999;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🧠 DOLLYA STORE - PAINEL</h1>
+
+  <!-- Cards serão gerados aqui -->
+  <div id="cards-container"></div>
+
+  <button id="save-btn">💾 Salvar Alterações</button>
+</div>
+
+<div id="notification" class="notification"></div>
+
+<script>
+const cardsContainer = document.getElementById('cards-container');
+const notification = document.getElementById('notification');
+
+// Função para mostrar notificação
+function showNotification(text) {
+  notification.textContent = text;
+  notification.style.display = 'block';
+  setTimeout(()=>{ notification.style.display = 'none'; }, 3000);
+}
+
+// Função para criar cards
+function createCards(stock) {
+  cardsContainer.innerHTML = '';
+  stock.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <div class="item-header">${item.emoji} ${item.name}</div>
+      <div class="field-group">
+        <label>Preço (R$)</label>
+        <input type="number" step="0.01" id="${item.id}_price" value="${item.price.toFixed(2)}">
+      </div>
+      <div class="field-group">
+        <label>Estoque</label>
+        <input type="number" id="${item.id}_quantity" value="${item.quantity}" min="0">
+      </div>
+      <div>Disponível: <span id="${item.id}_display">${item.quantity > 0 ? item.quantity : 'ESGOTADO'}</span></div>
+    `;
+    cardsContainer.appendChild(card);
+  });
+}
+
+// Função para carregar stock do servidor
+async function loadStock() {
+  try {
+    const res = await fetch('/get-stock');
+    const data = await res.json();
+    createCards(data);
+  } catch(err) {
+    console.error('Erro ao carregar stock:', err);
+    showNotification('Erro ao carregar stock!');
+  }
+}
+
+// Função para enviar alterações
+async function saveStock() {
+  const inputs = document.querySelectorAll('.item-card');
+  const payload = {};
+
+  inputs.forEach(card => {
+    const priceInput = card.querySelector('input[type="number"][id$="_price"]');
+    const qtyInput = card.querySelector('input[type="number"][id$="_quantity"]');
+
+    payload[priceInput.id] = parseFloat(priceInput.value);
+    payload[qtyInput.id] = parseInt(qtyInput.value);
+  });
+
+  try {
+    const res = await fetch('/update-stock', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    // Atualiza display de estoque
+    data.stock.forEach(item => {
+      const displayEl = document.getElementById(`${item.id}_display`);
+      if(displayEl) displayEl.textContent = item.quantity > 0 ? item.quantity : 'ESGOTADO';
+    });
+
+    showNotification('💾 Alterações salvas com sucesso!');
+  } catch(err) {
+    console.error('Erro ao salvar stock:', err);
+    showNotification('Erro ao salvar alterações!');
+  }
+}
+
+// Botão salvar
+document.getElementById('save-btn').addEventListener('click', saveStock);
+
+// Carregar stock ao abrir página
+window.onload = loadStock;
+</script>
+
+</body>
+</html>
